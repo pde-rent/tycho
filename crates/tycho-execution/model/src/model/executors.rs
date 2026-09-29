@@ -45,6 +45,7 @@ pub enum Executor {
     AerodromeV1,
     LiquidityParty,
     LunarBase,
+    Kuru,
     PropAMM,
     TychoSubsidizing,
 }
@@ -79,6 +80,7 @@ impl Executor {
         Executor::AerodromeV1,
         Executor::LiquidityParty,
         Executor::LunarBase,
+        Executor::Kuru,
         Executor::PropAMM,
         Executor::TychoSubsidizing,
     ];
@@ -339,6 +341,38 @@ impl Executor {
                         Address::POSSIBLY_ERC20_AND_NATIVE,
                     )?,
                     output_to_router: false,
+                })
+            }
+            // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/KuruExecutor.sol
+            Self::Kuru => {
+                let token_in = params.request(
+                    ParamKey::ProtocolData { swap_index, start: 20, end: 40 },
+                    Address::POSSIBLY_ERC20_AND_NATIVE,
+                )?;
+                let is_native_in = token_in == Address::NativeETH;
+                Ok(TransferData {
+                    transfer_type: if is_native_in {
+                        TransferType::TransferNativeInExecutor
+                    } else {
+                        TransferType::ProtocolWillDebit
+                    },
+                    receiver: if is_native_in {
+                        Address::Zero
+                    } else {
+                        params.request(
+                            ParamKey::ProtocolData { swap_index, start: 0, end: 20 },
+                            // trying more variants might find some very obscure bugs
+                            // in the future but slows down simulation a lot
+                            // and currently is ignored anyway
+                            Address::SENDER_CONTROLLED,
+                        )?
+                    },
+                    token_in,
+                    token_out: params.request(
+                        ParamKey::ProtocolData { swap_index, start: 40, end: 60 },
+                        Address::POSSIBLY_ERC20_AND_NATIVE,
+                    )?,
+                    output_to_router: true,
                 })
             }
             // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/PropAMMExecutor.sol
@@ -653,6 +687,35 @@ impl Executor {
                 // the actual swap logic doesn't matter
                 Ok(())
             }
+            // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/KuruExecutor.sol
+            Self::Kuru => {
+                let market = params.request(
+                    ParamKey::ProtocolData { swap_index, start: 0, end: 20 },
+                    // trying more variants might find some very obscure bugs
+                    // in the future but slows down simulation a lot
+                    // and currently is ignored anyway
+                    Address::SENDER_CONTROLLED,
+                )?;
+                if !market.is_sender_controlled() {
+                    return Err(Error::Ignore {
+                        reason: "kuru market not sender controlled. not low hanging fruit. would require simulating real market".into(),
+                    });
+                }
+
+                let token_in = params.request(
+                    ParamKey::ProtocolData { swap_index, start: 20, end: 40 },
+                    Address::VARIANTS,
+                )?;
+
+                // this simulates the transfer of eth to the market (at most `amount`)
+                if token_in == Address::NativeETH {
+                    state.eth_send_value(Address::Router, market, amount)?;
+                }
+
+                // if the sender controls the market,
+                // the actual swap logic doesn't matter
+                Ok(())
+            }
             // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/PropAMMExecutor.sol
             Self::PropAMM => {
                 let pamm = params.request(
@@ -730,6 +793,7 @@ impl Executor {
             Self::LunarBase => {
                 Err(Error::warning("LunarBase.get_callback_transfer_data is not modeled"))
             }
+            Self::Kuru => Err(Error::warning("Kuru.get_callback_transfer_data is not modeled")),
             Self::PropAMM => {
                 Err(Error::warning("PropAMM.get_callback_transfer_data is not modeled"))
             }
@@ -767,6 +831,7 @@ impl Executor {
             Self::AerodromeV1 => Err(Error::warning("AerodromeV1 doesn't use callbacks")),
             Self::LiquidityParty => Err(Error::warning("LiquidityParty doesn't use callbacks")),
             Self::LunarBase => Err(Error::warning("LunarBase doesn't use callbacks")),
+            Self::Kuru => Err(Error::warning("Kuru doesn't use callbacks")),
             Self::PropAMM => Err(Error::warning("PropAMM doesn't use callbacks")),
             Self::TychoSubsidizing => Err(Error::warning(
                 "TychoSubsidizing points the callback slot at its inner executor",
@@ -831,6 +896,8 @@ impl Executor {
             )?,
             // https://github.com/propeller-heads/tycho-indexer/blob/ae386ce3a9decbf8d73dab474e80a3d3785f02ef/crates/tycho-execution/contracts/src/executors/LunarBaseExecutor.sol#L37
             Self::LunarBase => Address::Router,
+            // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/KuruExecutor.sol
+            Self::Kuru => Address::Router,
             // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/PropAMMExecutor.sol
             Self::PropAMM => params.request(
                 ParamKey::ProtocolData { swap_index, start: 0, end: 20 },
