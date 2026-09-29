@@ -349,6 +349,8 @@ pub fn get_default_endpoint(chain: &Chain) -> Option<String> {
         Chain::Bsc => Some("https://bnb.streamingfast.io:443".to_string()),
         Chain::Elysium => Some("https://mainnet.elysium.streamingfast.io:443".to_string()),
         Chain::Arbitrum => Some("https://arb-one.streamingfast.io:443".to_string()),
+        // Extended blocks (storage changes), which the storage-reading packages need.
+        Chain::Monad => Some("https://mainnet.monad.streamingfast.io:443".to_string()),
         Chain::Starknet | Chain::ZkSync | Chain::Plasma | Chain::Custom(_) | _ => None,
     }
 }
