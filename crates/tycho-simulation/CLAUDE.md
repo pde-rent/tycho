@@ -23,7 +23,7 @@ for any protocol indexed by Tycho.
   - **Native** (`uniswap_v2/`, `uniswap_v3/`, `uniswap_v4/`, `ekubo/`, `ekubo_v3/`, `cowamm/`,
     `aero_basic/`, `aerodrome_v1/`, `aerodrome_slipstreams/`, `velodrome_slipstreams/`,
     `pancakeswap_v2/`,
-    `ramses_v3/`, `ring_swap_v2/`, `lunarbase/`, `native_wrapper/`, `sky/`, `etherfi/`,
+    `ramses_v3/`, `ring_swap_v2/`, `lunarbase/`, `kuru/`, `native_wrapper/`, `sky/`, `etherfi/`,
     `erc4626/`, `rocketpool/`, `pancakeswap_infinity_bin/`): Pure Rust math, no EVM execution.
     `aerodrome_slipstreams/` also serves Robinhood `up_v3` and AERO v1.1 `aero_cl` pools; for
     `aero_cl` the fee comes from the pool's swap hook (`utils/slipstreams/aero_hook_fee.rs`)
