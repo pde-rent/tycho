@@ -30,6 +30,7 @@ use tycho_simulation::{
                 fluid_v1_paused_pools_filter, liquidityparty_killed_pools_filter,
             },
             fluid::FluidV1,
+            kuru::state::KuruState,
             lido_v4::state::LidoV4State,
             lunarbase::LunarBaseState,
             pancakeswap_infinity_bin::state::PancakeswapInfinityBinState,
@@ -567,6 +568,9 @@ impl ProtocolStreamProcessor {
             }
             "biconomy" => {
                 stream = stream.exchange::<BiconomyState>("biconomy", tvl_filter.clone(), None);
+            }
+            "kuru" => {
+                stream = stream.exchange::<KuruState>("kuru", tvl_filter.clone(), None);
             }
             "ring_swap_v2" => {
                 stream =

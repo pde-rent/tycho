@@ -43,6 +43,7 @@ const PANCAKESWAP_INFINITY_BYTECODE_JSON: &str =
     include_str!("../fixtures/PancakeswapInfinity.runtime.json");
 const PANCAKESWAP_INFINITY_CL_ROBINHOOD_BYTECODE_JSON: &str =
     include_str!("../fixtures/PancakeswapInfinityRobinhood.runtime.json");
+const KURU_BYTECODE_JSON: &str = include_str!("../fixtures/Kuru.runtime.json");
 
 /// Mapping from protocol component patterns to executor bytecode JSON strings
 static EXECUTOR_MAPPING: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
@@ -81,6 +82,7 @@ static EXECUTOR_MAPPING: LazyLock<HashMap<&'static str, &'static str>> = LazyLoc
     map.insert("pancakeswap_infinity_cl", PANCAKESWAP_INFINITY_BYTECODE_JSON);
     map.insert("pancakeswap_infinity_cl_hooks", PANCAKESWAP_INFINITY_BYTECODE_JSON);
     map.insert("pancakeswap_infinity_bin", PANCAKESWAP_INFINITY_BYTECODE_JSON);
+    map.insert("kuru", KURU_BYTECODE_JSON);
     map
 });
 

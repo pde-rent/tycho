@@ -5,8 +5,8 @@ use tycho_simulation::{
             aero_basic::state::AeroBasicState,
             aerodrome_slipstreams::state::AerodromeSlipstreamsState, biconomy::BiconomyState,
             ekubo::state::EkuboState, ekubo_v3::state::EkuboV3State, etherfi::state::EtherfiState,
-            filters::ekubo_v3_extension_filter, fluid::FluidV1, lido_v4::state::LidoV4State,
-            lunarbase::LunarBaseState,
+            filters::ekubo_v3_extension_filter, fluid::FluidV1, kuru::state::KuruState,
+            lido_v4::state::LidoV4State, lunarbase::LunarBaseState,
             pancakeswap_infinity_bin::state::PancakeswapInfinityBinState,
             pancakeswap_v2::state::PancakeswapV2State, ramses_v3::state::RamsesV3State,
             ring_swap_v2::state::RingSwapV2State, rocketpool::state::RocketpoolState,
@@ -117,6 +117,12 @@ pub fn register_protocol(
             decoder_context,
         ),
         "sky" => stream_builder.exchange_with_decoder_context::<SkyState>(
+            protocol_system,
+            tvl_filter,
+            None,
+            decoder_context,
+        ),
+        "kuru" => stream_builder.exchange_with_decoder_context::<KuruState>(
             protocol_system,
             tvl_filter,
             None,

@@ -88,6 +88,7 @@ abstract contract RuntimeBytecodeFixtures is CommonBase, StdCheats {
         _executor("EkuboV3Robinhood", "robinhood", "ekubo_v3");
         _executor("FermiSwap", "ethereum", "vm:fermiswap");
         _executor("FluidV1", "ethereum", "fluid_v1");
+        _executor("Kuru", "monad", "kuru");
         _executor("LidoV4", "ethereum", "lido_v4");
         _executor("LiquidityParty", "ethereum", "vm:liquidityparty");
         _executor("LunarBase", "base", "lunarbase");
@@ -135,6 +136,9 @@ abstract contract RuntimeBytecodeFixtures is CommonBase, StdCheats {
         if (chain.eq("base")) return 46_500_000;
         if (chain.eq("bsc")) return 46_793_446;
         if (chain.eq("robinhood")) return 80_000_000;
+        // KuruExecutor takes no constructor arguments and reads no chain state; this only pins the
+        // fork, past the Kuru deployment.
+        if (chain.eq("monad")) return 60_000_000;
         revert(
             string.concat(chain, " has no fork block; add one to _forkBlock")
         );
