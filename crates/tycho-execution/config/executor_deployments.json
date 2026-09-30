@@ -448,5 +448,8 @@
       "contract": "MetricFallbackExecutor",
       "args": ["0xF70E16dcc8f065143C4FDD0a42e29BBfcc96DE17"]
     }
+  },
+  "monad": {
+    "vm:hanji": { "contract": "HanjiExecutor", "args": [] }
   }
 }

@@ -143,6 +143,9 @@ const deploy_protocols = {
         "rfq:metric",
         "fallback:rfq:metric",
     ],
+    "monad": [
+        "vm:hanji",
+    ],
 };
 
 async function main() {

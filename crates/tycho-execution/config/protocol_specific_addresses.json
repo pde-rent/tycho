@@ -67,6 +67,7 @@
     }
   },
   "plasma": {},
+  "monad": {},
   "robinhood": {
     "fallback:rfq:native": {
       "fallback_router": "0x7b200EfFfC1a680aad250a0e5a66692E74386A9E",
