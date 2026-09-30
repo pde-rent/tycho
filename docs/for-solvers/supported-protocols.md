@@ -43,6 +43,7 @@ Currently, Tycho supports the following protocols:
 <tr><td><code>lido_v4</code></td><td>Native (<code>LidoV4State</code>)</td><td>-</td><td>Ethereum</td><td></td></tr>
 <tr><td><code>etherfi</code></td><td>Native (<code>EtherfiState</code>)</td><td>-</td><td>Ethereum</td><td></td></tr>
 <tr><td><code>lunarbase</code></td><td>Native (<code>LunarBaseState</code>)</td><td>-</td><td>Base, BSC</td><td>The venue's maker sets the pool price. While the maker does not refresh it, the pool reports a stale price and quotes fail.</td></tr>
+<tr><td><code>vm:hanji</code></td><td>VM (<code>EVMPoolState</code>)<br>[DCI indexed]</td><td>-</td><td>Monad</td><td>Exact-input (sell) quotes only. One component per market's fast-quoter proxy, which has the LP manager quote just in time from maker prices bounded by Pyth. Quotes are for a contract caller, the way TychoRouter trades: the proxy prices contract callers differently from EOAs. Components carry no balances, so a TVL filter above zero drops them.</td></tr>
 </tbody>
 </table>
 
@@ -169,6 +170,10 @@ fn register_exchanges(
                 .exchange::<UniswapV3State>("stockiumswap_v3", tvl_filter.clone(), None)
                 .exchange::<AeroBasicState>("aero_basic", tvl_filter.clone(), None)
                 .exchange::<AerodromeSlipstreamsState>("aero_cl", tvl_filter.clone(), None)
+        }
+        Chain::Monad => {
+            builder = builder
+                .exchange::<EVMPoolState<PreCachedDB>>("vm:hanji", tvl_filter.clone(), None)
         }
         _ => {}
     }
