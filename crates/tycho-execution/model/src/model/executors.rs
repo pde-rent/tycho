@@ -45,6 +45,7 @@ pub enum Executor {
     AerodromeV1,
     LiquidityParty,
     LunarBase,
+    Hanji,
     PropAMM,
     TychoSubsidizing,
 }
@@ -79,6 +80,7 @@ impl Executor {
         Executor::AerodromeV1,
         Executor::LiquidityParty,
         Executor::LunarBase,
+        Executor::Hanji,
         Executor::PropAMM,
         Executor::TychoSubsidizing,
     ];
@@ -341,6 +343,29 @@ impl Executor {
                     output_to_router: false,
                 })
             }
+            // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/HanjiExecutor.sol
+            // the market proxy pulls tokenIn from the router.
+            // native coin paid out by the market is wrapped to tokenOut,
+            // so the router always receives tokenOut as an ERC20
+            Self::Hanji => Ok(TransferData {
+                transfer_type: TransferType::ProtocolWillDebit,
+                receiver: params.request(
+                    ParamKey::ProtocolData { swap_index, start: 0, end: 20 },
+                    // trying more variants might find some very obscure bugs
+                    // in the future but slows down simulation a lot
+                    // and currently is ignored anyway
+                    Address::SENDER_CONTROLLED,
+                )?,
+                token_in: params.request(
+                    ParamKey::ProtocolData { swap_index, start: 20, end: 40 },
+                    Address::POSSIBLY_ERC20_AND_NATIVE,
+                )?,
+                token_out: params.request(
+                    ParamKey::ProtocolData { swap_index, start: 40, end: 60 },
+                    Address::POSSIBLY_ERC20_AND_NATIVE,
+                )?,
+                output_to_router: true,
+            }),
             // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/PropAMMExecutor.sol
             Self::PropAMM => Ok(TransferData {
                 transfer_type: TransferType::Transfer,
@@ -653,6 +678,27 @@ impl Executor {
                 // the actual swap logic doesn't matter
                 Ok(())
             }
+            // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/HanjiExecutor.sol
+            // not modelled: partial fills revert and input below one share (sell X) or left
+            // over from the last share (sell Y) stays in the router
+            Self::Hanji => {
+                let market = params.request(
+                    ParamKey::ProtocolData { swap_index, start: 0, end: 20 },
+                    // trying more variants might find some very obscure bugs
+                    // in the future but slows down simulation a lot
+                    // and currently is ignored anyway
+                    Address::SENDER_CONTROLLED,
+                )?;
+                if market.is_sender_controlled() {
+                    // if the sender controls the market,
+                    // the actual swap logic doesn't matter
+                    Ok(())
+                } else {
+                    Err(Error::Ignore {
+                        reason: "hanji market not sender controlled. not low hanging fruit. would require simulating real market".into(),
+                    })
+                }
+            }
             // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/PropAMMExecutor.sol
             Self::PropAMM => {
                 let pamm = params.request(
@@ -730,6 +776,7 @@ impl Executor {
             Self::LunarBase => {
                 Err(Error::warning("LunarBase.get_callback_transfer_data is not modeled"))
             }
+            Self::Hanji => Err(Error::warning("Hanji.get_callback_transfer_data is not modeled")),
             Self::PropAMM => {
                 Err(Error::warning("PropAMM.get_callback_transfer_data is not modeled"))
             }
@@ -767,6 +814,7 @@ impl Executor {
             Self::AerodromeV1 => Err(Error::warning("AerodromeV1 doesn't use callbacks")),
             Self::LiquidityParty => Err(Error::warning("LiquidityParty doesn't use callbacks")),
             Self::LunarBase => Err(Error::warning("LunarBase doesn't use callbacks")),
+            Self::Hanji => Err(Error::warning("Hanji doesn't use callbacks")),
             Self::PropAMM => Err(Error::warning("PropAMM doesn't use callbacks")),
             Self::TychoSubsidizing => Err(Error::warning(
                 "TychoSubsidizing points the callback slot at its inner executor",
@@ -831,6 +879,8 @@ impl Executor {
             )?,
             // https://github.com/propeller-heads/tycho-indexer/blob/ae386ce3a9decbf8d73dab474e80a3d3785f02ef/crates/tycho-execution/contracts/src/executors/LunarBaseExecutor.sol#L37
             Self::LunarBase => Address::Router,
+            // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/HanjiExecutor.sol
+            Self::Hanji => Address::Router,
             // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/PropAMMExecutor.sol
             Self::PropAMM => params.request(
                 ParamKey::ProtocolData { swap_index, start: 0, end: 20 },
