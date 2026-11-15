@@ -46,6 +46,7 @@ pub enum Executor {
     LiquidityParty,
     LunarBase,
     PropAMM,
+    WooFi,
     TychoSubsidizing,
 }
 
@@ -67,7 +68,7 @@ pub struct CallbackTransferData {
 
 impl Executor {
     /// Array containing all [Executor]s.
-    pub const VARIANTS: [Executor; 13] = [
+    pub const VARIANTS: [Executor; 14] = [
         Executor::Curve,
         Executor::ERC4626,
         Executor::FluidV1,
@@ -80,6 +81,7 @@ impl Executor {
         Executor::LiquidityParty,
         Executor::LunarBase,
         Executor::PropAMM,
+        Executor::WooFi,
         Executor::TychoSubsidizing,
     ];
 
@@ -341,6 +343,27 @@ impl Executor {
                     output_to_router: false,
                 })
             }
+            // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/WooFiExecutor.sol
+            // the router transfers the input to the pool
+            Self::WooFi => Ok(TransferData {
+                transfer_type: TransferType::Transfer,
+                receiver: params.request(
+                    ParamKey::ProtocolData { swap_index, start: 0, end: 20 },
+                    // trying more variants might find some very obscure bugs
+                    // in the future but slows down simulation a lot
+                    // and currently is ignored anyway
+                    Address::SENDER_CONTROLLED,
+                )?,
+                token_in: params.request(
+                    ParamKey::ProtocolData { swap_index, start: 20, end: 40 },
+                    Address::POSSIBLY_ERC20_AND_NATIVE,
+                )?,
+                token_out: params.request(
+                    ParamKey::ProtocolData { swap_index, start: 40, end: 60 },
+                    Address::POSSIBLY_ERC20_AND_NATIVE,
+                )?,
+                output_to_router: false,
+            }),
             // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/PropAMMExecutor.sol
             Self::PropAMM => Ok(TransferData {
                 transfer_type: TransferType::Transfer,
@@ -653,6 +676,25 @@ impl Executor {
                 // the actual swap logic doesn't matter
                 Ok(())
             }
+            // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/WooFiExecutor.sol
+            Self::WooFi => {
+                let venue = params.request(
+                    ParamKey::ProtocolData { swap_index, start: 0, end: 20 },
+                    // trying more variants might find some very obscure bugs
+                    // in the future but slows down simulation a lot
+                    // and currently is ignored anyway
+                    Address::SENDER_CONTROLLED,
+                )?;
+                if venue.is_sender_controlled() {
+                    // if the sender controls the venue,
+                    // the actual swap logic doesn't matter
+                    Ok(())
+                } else {
+                    Err(Error::Ignore {
+                        reason: "woofi pool not sender controlled. not low hanging fruit. would require simulating real venue".into(),
+                    })
+                }
+            }
             // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/PropAMMExecutor.sol
             Self::PropAMM => {
                 let pamm = params.request(
@@ -733,6 +775,7 @@ impl Executor {
             Self::PropAMM => {
                 Err(Error::warning("PropAMM.get_callback_transfer_data is not modeled"))
             }
+            Self::WooFi => Err(Error::warning("WooFi.get_callback_transfer_data is not modeled")),
             Self::TychoSubsidizing => Err(Error::warning(
                 "TychoSubsidizing points the callback slot at its inner executor",
             )),
@@ -768,6 +811,7 @@ impl Executor {
             Self::LiquidityParty => Err(Error::warning("LiquidityParty doesn't use callbacks")),
             Self::LunarBase => Err(Error::warning("LunarBase doesn't use callbacks")),
             Self::PropAMM => Err(Error::warning("PropAMM doesn't use callbacks")),
+            Self::WooFi => Err(Error::warning("WooFi doesn't use callbacks")),
             Self::TychoSubsidizing => Err(Error::warning(
                 "TychoSubsidizing points the callback slot at its inner executor",
             )),
@@ -831,6 +875,14 @@ impl Executor {
             )?,
             // https://github.com/propeller-heads/tycho-indexer/blob/ae386ce3a9decbf8d73dab474e80a3d3785f02ef/crates/tycho-execution/contracts/src/executors/LunarBaseExecutor.sol#L37
             Self::LunarBase => Address::Router,
+            // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/WooFiExecutor.sol
+            Self::WooFi => params.request(
+                ParamKey::ProtocolData { swap_index, start: 0, end: 20 },
+                // trying more variants might find some very obscure bugs
+                // in the future but slows down simulation a lot
+                // and currently is ignored anyway
+                Address::SENDER_CONTROLLED,
+            )?,
             // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/PropAMMExecutor.sol
             Self::PropAMM => params.request(
                 ParamKey::ProtocolData { swap_index, start: 0, end: 20 },
