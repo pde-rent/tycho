@@ -143,6 +143,9 @@ const deploy_protocols = {
         "rfq:metric",
         "fallback:rfq:metric",
     ],
+    "monad": [
+        "thog",
+    ],
 };
 
 async function main() {
