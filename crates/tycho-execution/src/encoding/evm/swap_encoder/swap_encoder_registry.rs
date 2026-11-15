@@ -292,7 +292,8 @@ impl SwapEncoderRegistry {
             "erc4626" => {
                 Ok(Box::new(ERC4626SwapEncoder::new(executor_address, self.chain, config)?))
             }
-            "lunarbase" => {
+            // Thog takes the same packed (venue, tokenIn, tokenOut) data as LunarBase.
+            "lunarbase" | "thog" => {
                 Ok(Box::new(LunarBaseSwapEncoder::new(executor_address, self.chain, config)?))
             }
             NATIVE_WRAPPER_PROTOCOL_SYSTEM => {
@@ -352,9 +353,16 @@ impl SwapEncoderRegistry {
 
 #[cfg(test)]
 mod tests {
+    use alloy::hex::encode;
+    use num_bigint::BigUint;
     use rstest::rstest;
+    use tycho_common::models::protocol::ProtocolComponent;
 
     use super::*;
+    use crate::encoding::{
+        evm::utils::write_calldata_to_file,
+        models::{default_token, EncodingContext, Swap},
+    };
 
     /// A single `pricelevelstream` config entry serves the whole protocol family: the bare
     /// family key resolves as an exact entry, and every `pricelevelstream:{protocol}` protocol —
@@ -599,5 +607,55 @@ mod tests {
                 .unwrap_or_else(|| panic!("no encoder registered for {protocol}"));
             assert_eq!(encoder.executor_address(), &executor_address);
         }
+    }
+
+    /// Thog resolves to the packed `(amm, tokenIn, tokenOut)` encoder at its own executor address.
+    /// The bytes are the layout `ThogExecutor` decodes, and `Thog.t.sol` loads them.
+    #[test]
+    fn test_thog_encodes_packed_amm_and_tokens() {
+        let executor = "0x1111111111111111111111111111111111111111";
+        let executors = format!(r#"{{"ethereum": {{"thog": "{executor}"}}}}"#);
+        let registry = SwapEncoderRegistry::new(Chain::Ethereum)
+            .add_default_encoders(Some(executors))
+            .unwrap();
+        let encoder = registry
+            .get_encoder("thog")
+            .expect("thog must resolve to an encoder");
+        assert_eq!(encoder.executor_address(), &Bytes::from_str(executor).unwrap());
+
+        let token_in = Bytes::from("0x754704Bc059F8C67012fEd69BC8A327a5aafb603");
+        let token_out = Bytes::from("0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A");
+        let swap = Swap::new(
+            ProtocolComponent {
+                id: "0x80c74517BCC2D67fFE02D3ED886796272F647210".to_owned(),
+                protocol_system: "thog".to_owned(),
+                ..Default::default()
+            },
+            default_token(token_in.clone()),
+            default_token(token_out.clone()),
+            BigUint::ZERO,
+        );
+        let context = EncodingContext {
+            router_address: Some(Bytes::zero(20)),
+            group_token_in: token_in,
+            group_token_out: token_out,
+            origin: None,
+        };
+
+        let hex_swap = encode(
+            encoder
+                .encode_swap(&swap, &context)
+                .unwrap(),
+        );
+
+        assert_eq!(
+            hex_swap,
+            concat!(
+                "80c74517bcc2d67ffe02d3ed886796272f647210",
+                "754704bc059f8c67012fed69bc8a327a5aafb603",
+                "3bd359c1119da7da1d913d1c4d2b7c461115433a",
+            )
+        );
+        write_calldata_to_file("test_encode_thog_usdc_wmon", hex_swap.as_str());
     }
 }
