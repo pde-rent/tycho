@@ -46,6 +46,7 @@ pub enum Executor {
     LiquidityParty,
     LunarBase,
     PropAMM,
+    Poe,
     TychoSubsidizing,
 }
 
@@ -67,7 +68,7 @@ pub struct CallbackTransferData {
 
 impl Executor {
     /// Array containing all [Executor]s.
-    pub const VARIANTS: [Executor; 13] = [
+    pub const VARIANTS: [Executor; 14] = [
         Executor::Curve,
         Executor::ERC4626,
         Executor::FluidV1,
@@ -80,6 +81,7 @@ impl Executor {
         Executor::LiquidityParty,
         Executor::LunarBase,
         Executor::PropAMM,
+        Executor::Poe,
         Executor::TychoSubsidizing,
     ];
 
@@ -341,6 +343,21 @@ impl Executor {
                     output_to_router: false,
                 })
             }
+            // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/PoeExecutor.sol
+            // the pool is paid in its callback, nothing is transferred up front
+            Self::Poe => Ok(TransferData {
+                transfer_type: TransferType::None,
+                receiver: Address::Zero,
+                token_in: params.request(
+                    ParamKey::ProtocolData { swap_index, start: 20, end: 40 },
+                    Address::POSSIBLY_ERC20_AND_NATIVE,
+                )?,
+                token_out: params.request(
+                    ParamKey::ProtocolData { swap_index, start: 40, end: 60 },
+                    Address::POSSIBLY_ERC20_AND_NATIVE,
+                )?,
+                output_to_router: false,
+            }),
             // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/PropAMMExecutor.sol
             Self::PropAMM => Ok(TransferData {
                 transfer_type: TransferType::Transfer,
@@ -653,6 +670,28 @@ impl Executor {
                 // the actual swap logic doesn't matter
                 Ok(())
             }
+            // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/PoeExecutor.sol
+            Self::Poe => {
+                let pool = params.request(
+                    ParamKey::ProtocolData { swap_index, start: 0, end: 20 },
+                    // trying more variants might find some very obscure bugs
+                    // in the future but slows down simulation a lot
+                    // and currently is ignored anyway
+                    Address::SENDER_CONTROLLED,
+                )?;
+                if pool.is_sender_controlled() {
+                    // if the sender controls the pool,
+                    // the actual swap logic doesn't matter
+                    state.enter_callback(pool);
+                    _call_handle_callback_on_executor(params, state, vault, log, swap_index)?;
+                    state.leave_callback();
+                    Ok(())
+                } else {
+                    Err(Error::Ignore {
+                        reason: "lfj poe pool not sender controlled. not low hanging fruit. would require simulating real pool".into(),
+                    })
+                }
+            }
             // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/PropAMMExecutor.sol
             Self::PropAMM => {
                 let pamm = params.request(
@@ -733,6 +772,12 @@ impl Executor {
             Self::PropAMM => {
                 Err(Error::warning("PropAMM.get_callback_transfer_data is not modeled"))
             }
+            // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/PoeExecutor.sol
+            Self::Poe => Ok(CallbackTransferData {
+                transfer_type: TransferType::Transfer,
+                // called via delegatecall. therefore not the router
+                receiver: state.msg_sender(),
+            }),
             Self::TychoSubsidizing => Err(Error::warning(
                 "TychoSubsidizing points the callback slot at its inner executor",
             )),
@@ -768,6 +813,9 @@ impl Executor {
             Self::LiquidityParty => Err(Error::warning("LiquidityParty doesn't use callbacks")),
             Self::LunarBase => Err(Error::warning("LunarBase doesn't use callbacks")),
             Self::PropAMM => Err(Error::warning("PropAMM doesn't use callbacks")),
+            // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/PoeExecutor.sol
+            // not worth modeling: the pool check and the exact-amount check are reverts only
+            Self::Poe => Ok(()),
             Self::TychoSubsidizing => Err(Error::warning(
                 "TychoSubsidizing points the callback slot at its inner executor",
             )),
@@ -831,6 +879,8 @@ impl Executor {
             )?,
             // https://github.com/propeller-heads/tycho-indexer/blob/ae386ce3a9decbf8d73dab474e80a3d3785f02ef/crates/tycho-execution/contracts/src/executors/LunarBaseExecutor.sol#L37
             Self::LunarBase => Address::Router,
+            // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/PoeExecutor.sol
+            Self::Poe => Address::Router,
             // https://github.com/propeller-heads/tycho/blob/main/crates/tycho-execution/contracts/src/executors/PropAMMExecutor.sol
             Self::PropAMM => params.request(
                 ParamKey::ProtocolData { swap_index, start: 0, end: 20 },

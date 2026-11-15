@@ -24,16 +24,17 @@ use crate::encoding::{
             etherfi::EtherfiSwapEncoder, fallback::FallbackSwapEncoder,
             fermiswap::FermiSwapEncoder, fluid_v1::FluidV1SwapEncoder,
             hashflow::HashflowSwapEncoder, hashflow_fallback::HashflowFallbackSwapEncoder,
-            lido_v4::LidoV4SwapEncoder, liquidity_party::LiquidityPartySwapEncoder,
-            liquorice::LiquoriceSwapEncoder, liquorice_fallback::LiquoriceFallbackSwapEncoder,
-            lunarbase::LunarBaseSwapEncoder, maverick_v2::MaverickV2SwapEncoder,
-            metric::MetricSwapEncoder, metric_fallback::MetricFallbackSwapEncoder,
-            native::NativeSwapEncoder, native_fallback::NativeFallbackSwapEncoder,
-            native_wrap::WrapSwapEncoder, pancakeswap_infinity::PancakeswapInfinitySwapEncoder,
-            propamm::PropAMMSwapEncoder, ring_swap_v2::RingSwapV2SwapEncoder,
-            rocketpool::RocketpoolSwapEncoder, sky::SkySwapEncoder,
-            slipstreams::SlipstreamsSwapEncoder, uniswap_v2::UniswapV2SwapEncoder,
-            uniswap_v3::UniswapV3SwapEncoder, uniswap_v4::UniswapV4SwapEncoder,
+            lfj_poe::LfjPoeSwapEncoder, lido_v4::LidoV4SwapEncoder,
+            liquidity_party::LiquidityPartySwapEncoder, liquorice::LiquoriceSwapEncoder,
+            liquorice_fallback::LiquoriceFallbackSwapEncoder, lunarbase::LunarBaseSwapEncoder,
+            maverick_v2::MaverickV2SwapEncoder, metric::MetricSwapEncoder,
+            metric_fallback::MetricFallbackSwapEncoder, native::NativeSwapEncoder,
+            native_fallback::NativeFallbackSwapEncoder, native_wrap::WrapSwapEncoder,
+            pancakeswap_infinity::PancakeswapInfinitySwapEncoder, propamm::PropAMMSwapEncoder,
+            ring_swap_v2::RingSwapV2SwapEncoder, rocketpool::RocketpoolSwapEncoder,
+            sky::SkySwapEncoder, slipstreams::SlipstreamsSwapEncoder,
+            uniswap_v2::UniswapV2SwapEncoder, uniswap_v3::UniswapV3SwapEncoder,
+            uniswap_v4::UniswapV4SwapEncoder,
         },
     },
     swap_encoder::SwapEncoder,
@@ -294,6 +295,9 @@ impl SwapEncoderRegistry {
             }
             "lunarbase" => {
                 Ok(Box::new(LunarBaseSwapEncoder::new(executor_address, self.chain, config)?))
+            }
+            "lfj_poe" => {
+                Ok(Box::new(LfjPoeSwapEncoder::new(executor_address, self.chain, config)?))
             }
             NATIVE_WRAPPER_PROTOCOL_SYSTEM => {
                 Ok(Box::new(WrapSwapEncoder::new(executor_address, self.chain, config)?))
@@ -599,5 +603,21 @@ mod tests {
                 .unwrap_or_else(|| panic!("no encoder registered for {protocol}"));
             assert_eq!(encoder.executor_address(), &executor_address);
         }
+    }
+
+    /// `lfj_poe` resolves to its own encoder at its own executor address.
+    #[test]
+    fn test_lfj_poe_resolves_to_its_executor() {
+        let executor = "0x5555555555555555555555555555555555555555";
+        let executors = format!(r#"{{"ethereum": {{"lfj_poe": "{executor}"}}}}"#);
+        let registry = SwapEncoderRegistry::new(Chain::Ethereum)
+            .add_default_encoders(Some(executors))
+            .unwrap();
+
+        let encoder = registry
+            .get_encoder("lfj_poe")
+            .expect("lfj_poe must resolve to an encoder");
+
+        assert_eq!(encoder.executor_address(), &Bytes::from_str(executor).unwrap());
     }
 }
